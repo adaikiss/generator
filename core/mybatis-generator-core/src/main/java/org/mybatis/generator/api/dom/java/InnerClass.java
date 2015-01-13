@@ -149,6 +149,9 @@ public class InnerClass extends JavaElement {
 
         if (superClass != null) {
             sb.append(" extends "); //$NON-NLS-1$
+            if(superClass.getShortName().equals(getType().getShortName())){
+            	sb.append(superClass.getPackageName()).append(".");
+            }
             sb.append(superClass.getShortName());
         }
 
@@ -162,7 +165,9 @@ public class InnerClass extends JavaElement {
                 } else {
                     comma = true;
                 }
-
+                if(fqjt.getShortName().equals(getType().getShortName())){
+                	sb.append(fqjt.getPackageName()).append(".");
+                }
                 sb.append(fqjt.getShortName());
             }
         }
