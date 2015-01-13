@@ -137,7 +137,9 @@ public class Interface extends JavaElement implements CompilationUnit {
                 } else {
                     comma = true;
                 }
-
+                if(fqjt.getShortName().equals(getType().getShortName())){
+                	sb.append(fqjt.getPackageName()).append(".");
+                }
                 sb.append(fqjt.getShortName());
             }
         }
