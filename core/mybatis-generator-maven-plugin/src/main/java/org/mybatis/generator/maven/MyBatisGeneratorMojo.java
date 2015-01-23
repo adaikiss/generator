@@ -147,6 +147,13 @@ public class MyBatisGeneratorMojo extends AbstractMojo {
      */
     private boolean skip;
 
+    /**
+     * Clean output directory if exists 
+     * 
+     * @parameter expression="${mybatis.generator.clean}" default-value=false
+     */
+    private boolean clean;
+
     public void execute() throws MojoExecutionException {
         if (skip) {
             getLog().info( "MyBatis generator is skipped." );
@@ -245,7 +252,9 @@ public class MyBatisGeneratorMojo extends AbstractMojo {
         if (project != null && outputDirectory != null
                 && outputDirectory.exists()) {
             project.addCompileSourceRoot(outputDirectory.getAbsolutePath());
-
+            if(clean){
+            	deleteDirectoryContent(outputDirectory);
+            }
             Resource resource = new Resource();
             resource.setDirectory(outputDirectory.getAbsolutePath());
             resource.addInclude("**/*.xml");
@@ -266,5 +275,19 @@ public class MyBatisGeneratorMojo extends AbstractMojo {
 
     public File getOutputDirectory() {
         return outputDirectory;
+    }
+
+    private void deleteDirectoryContent(File file){
+    	if(!file.exists()){
+    		return;
+    	}
+    	for(File f : file.listFiles()){
+    		if(f.isFile()){
+        		f.delete();
+        		continue;
+        	}
+    		deleteDirectoryContent(f);
+    		f.delete();
+    	}
     }
 }
