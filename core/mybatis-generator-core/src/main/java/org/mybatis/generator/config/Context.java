@@ -21,12 +21,14 @@ import static org.mybatis.generator.internal.util.StringUtility.stringHasValue;
 import static org.mybatis.generator.internal.util.messages.Messages.getString;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 import org.mybatis.generator.api.CommentGenerator;
+import org.mybatis.generator.api.DatabaseMetaDataProvider;
 import org.mybatis.generator.api.GeneratedJavaFile;
 import org.mybatis.generator.api.GeneratedXmlFile;
 import org.mybatis.generator.api.JavaFormatter;
@@ -83,6 +85,11 @@ public class Context extends PropertyHolder {
     private JavaFormatter javaFormatter;
     
     private XmlFormatter xmlFormatter;
+
+    /**
+     * Database MetaData provider, eg:offline metadata provider
+     */
+    private DatabaseMetaDataProvider databaseMetaDataProvider;
 
     /**
      * Constructs a Context object.
@@ -142,12 +149,11 @@ public class Context extends PropertyHolder {
         if (!stringHasValue(id)) {
             errors.add(getString("ValidationError.16")); //$NON-NLS-1$
         }
-
-        if (jdbcConnectionConfiguration == null) {
-            errors.add(getString("ValidationError.10", id)); //$NON-NLS-1$
-        } else {
-            jdbcConnectionConfiguration.validate(errors);
-        }
+//        if (jdbcConnectionConfiguration == null) {
+//            errors.add(getString("ValidationError.10", id)); //$NON-NLS-1$
+//        } else {
+//            jdbcConnectionConfiguration.validate(errors);
+//        }
 
         if (javaModelGeneratorConfiguration == null) {
             errors.add(getString("ValidationError.8", id)); //$NON-NLS-1$
@@ -425,6 +431,22 @@ public class Context extends PropertyHolder {
             List<String> warnings, Set<String> fullyQualifiedTableNames)
             throws SQLException, InterruptedException {
 
+        pluginAggregator = new PluginAggregator();
+        for (PluginConfiguration pluginConfiguration : pluginConfigurations) {
+            Plugin plugin = ObjectFactory.createPlugin(this,
+                    pluginConfiguration);
+            if(DatabaseMetaDataProvider.class.isAssignableFrom(plugin.getClass())){//database metadata provider
+                this.databaseMetaDataProvider = (DatabaseMetaDataProvider)plugin;
+                continue;
+            }
+            if (plugin.validate(warnings)) {
+                pluginAggregator.addPlugin(plugin);
+            } else {
+                warnings.add(getString("Warning.24", //$NON-NLS-1$
+                        pluginConfiguration.getConfigurationType(), id));
+            }
+        }
+
         introspectedTables = new ArrayList<IntrospectedTable>();
         JavaTypeResolver javaTypeResolver = ObjectFactory
                 .createJavaTypeResolver(this, warnings);
@@ -433,10 +455,20 @@ public class Context extends PropertyHolder {
 
         try {
             callback.startTask(getString("Progress.0")); //$NON-NLS-1$
-            connection = getConnection();
+            DatabaseMetaData databaseMetaData;
+            if(this.databaseMetaDataProvider != null){
+                try {
+                    databaseMetaData = databaseMetaDataProvider.getMetaData();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }else{
+                connection = getConnection();
+                databaseMetaData = connection.getMetaData();
+            }
 
             DatabaseIntrospector databaseIntrospector = new DatabaseIntrospector(
-                    this, connection.getMetaData(), javaTypeResolver, warnings);
+                    this, databaseMetaData, javaTypeResolver, warnings);
 
             for (TableConfiguration tc : tableConfigurations) {
                 String tableName = composeFullyQualifiedTableName(tc.getCatalog(), tc
@@ -465,7 +497,9 @@ public class Context extends PropertyHolder {
                 callback.checkCancel();
             }
         } finally {
-            closeConnection(connection);
+            if(databaseMetaDataProvider == null){
+                closeConnection(connection);
+            }
         }
     }
 
@@ -486,17 +520,6 @@ public class Context extends PropertyHolder {
             List<GeneratedXmlFile> generatedXmlFiles, List<String> warnings)
             throws InterruptedException {
 
-        pluginAggregator = new PluginAggregator();
-        for (PluginConfiguration pluginConfiguration : pluginConfigurations) {
-            Plugin plugin = ObjectFactory.createPlugin(this,
-                    pluginConfiguration);
-            if (plugin.validate(warnings)) {
-                pluginAggregator.addPlugin(plugin);
-            } else {
-                warnings.add(getString("Warning.24", //$NON-NLS-1$
-                        pluginConfiguration.getConfigurationType(), id));
-            }
-        }
 
         if (introspectedTables != null) {
             for (IntrospectedTable introspectedTable : introspectedTables) {
